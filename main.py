@@ -31,6 +31,36 @@ def argument_parse(src, inp):
     return arguments.src, arguments.inp
 
 
+def xml_check(root):
+    print('-------XML CHECK-------')
+    # Check if program tag exists
+    if root.tag != 'program': return sys.exit('program tag error')
+
+    # Check language attribute
+    if root.attrib.get('language') is None or root.attrib.get('language').lower() != "ippcode23":
+        return sys.exit("Language error")
+
+    # Iterate children of root
+    currentOrder = 0
+    for instruct in root:
+        # Check if tag is instruction
+        if instruct.tag != 'instruction': sys.exit(31)
+
+        # Check order of instructions
+        currentOrder = int(instruct.get('order')) if int(instruct.get('order')) > currentOrder else sys.exit(
+            'wrong instruction order')
+
+        instruction_attribs = list(instruct.attrib.keys())
+        # Check if both order and opcode exist
+        if not ('order' in instruction_attribs) or not ('opcode' in instruction_attribs): sys.exit(
+            'child order/opcode error')
+
+        # Check if type attribute exists
+        for argum in instruct:
+            if 'type' not in argum.attrib.keys(): sys.exit("No type in argum param")
+    print('----------OK----------')
+
+
 def main():
     src = ''
     inp = ''
@@ -43,18 +73,17 @@ def main():
     source_handle = open(argument[0], 'r') if argument[0] is not None else sys.stdin
     input_handle = open(argument[1], 'r') if argument[1] is not None else sys.stdin
 
-    tree = ET.parse(source_handle)
+    try:
+        tree = ET.parse(source_handle)
+    except ET.ParseError:
+        sys.exit("XML parse error")
+
     root = tree.getroot()
+    xml_check(root)
     # iterate instructions
     for child in root:
-        if child.tag != 'instruction': sys.exit()
-        print(child.tag)
-        child_attribs = list(child.attrib.keys())
-        if not('order' in child_attribs) or not('opcode' in child_attribs): sys.exit()
-        print(child.get('order') + " - " + child.get('opcode'))
         for subchild in child:
-            if not(re.match(r"arg[123]", subchild.tag)): sys.exit()
-            print(subchild.tag + " = " + subchild.text)
+            if not (re.match(r"arg[123]", subchild.tag)): sys.exit('wrong arg tag')
 
 
 if __name__ == '__main__':
