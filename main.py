@@ -4,7 +4,16 @@ import re
 import xml.etree.ElementTree as ET
 
 
-class arg:
+class memory:
+    frames = {
+        'GF': dict(),
+        'LF': list(),
+        'TF': None
+    }
+    memory_stack = list()
+
+
+class variable:
     def __init__(self, arg_type, value):
         self.type = arg_type
         self.value = value
@@ -18,6 +27,10 @@ class instruction:
 
     def add_argument(self, arg_type, value):
         self.args.append(value)
+        self.args.append(variable(arg_type, value))
+
+    def move(self):
+
 
 
 def argument_parse(src, inp):
@@ -64,6 +77,7 @@ def xml_check(root):
 def main():
     src = ''
     inp = ''
+    instruction_list = list()
     argument = argument_parse(src, inp)
 
     # print(argument[0])  # --source
@@ -78,12 +92,16 @@ def main():
     except ET.ParseError:
         sys.exit("XML parse error")
 
-    root = tree.getroot()
+    root = tree.getroot()       # <program language>
     xml_check(root)
     # iterate instructions
-    for child in root:
-        for subchild in child:
-            if not (re.match(r"arg[123]", subchild.tag)): sys.exit('wrong arg tag')
+    for instruct in root:          # <instruction order= opcode=>
+        instruct_tmp = instruction(instruct.get('order'), instruct.get('opcode'))
+
+        # Create instruction
+        for argum in instruct:  # <arg type= >text
+            instruct_tmp.add_argument(argum.get('type'), argum.text)
+        instruction_list.append(tmp)
 
 
 if __name__ == '__main__':
