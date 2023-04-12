@@ -3,6 +3,11 @@ import sys
 import re
 import xml.etree.ElementTree as ET
 
+"""
+TODO:
+move() symb/var
+
+"""
 
 class memory:
     frames = {
@@ -36,6 +41,15 @@ class instruction:
             sys.stderr.write("Memory frame doesn't exist")
             exit(55)
 
+    def set_var_frame(self, frame, var_name, symb):
+        if frame in ('GF', 'TF'):
+            memory.frames[frame][var_name] = symb
+        elif frame == 'LF':
+            memory.frames['LF'][-1][var_name] = symb
+        else:
+            sys.stderr.write("Non-existent FRAME")
+            exit()
+
     def check_var(self, mem_frame, var_name) -> bool:
         self.check_frame(mem_frame)
         match var_name:
@@ -47,12 +61,31 @@ class instruction:
                 return var_name in memory.frames['TF'].keys()
         return False
 
-
     def move(self):
-        print('MOVE IN PROGRESS')
+        var = self.get_args()[0].value
+        frame, var_name = var.split('@', 1)
 
-        for arg in self.args:
-            print(arg.value + " " + arg.type)
+        symb = self.get_args()[1].value
+        self.set_var_frame(frame, var_name, symb)
+
+    def write(self):
+        result = self.symb_value(self.get_args()[0].value)
+        print('WRITE RESULT: ' + result)
+
+    def symb_value(self, value):
+        prefix, suffix = value.split("@", 1)
+        print('PREF: '+prefix+' SUF: '+suffix)
+        if prefix not in ('GF', 'LF', 'TF'):
+            return suffix
+        match prefix:
+            case 'TF':
+                return memory.frames['TF'][suffix]
+            case 'GF':
+                return memory.frames['GF'][suffix]
+            case 'LF':
+                return memory.frames['LF'][-1][suffix]
+        sys.stderr.write('Wrong symb')
+        exit()
 
 
     def createframe(self):
@@ -73,8 +106,10 @@ class instruction:
 
     def instr_switch(self):
         match self.opcode:
-            case 'MOVE':    # <var>  <=  <symb>
+            case 'MOVE':  # <var>  <=  <symb>
                 self.move()
+            case 'WRITE': # <symb>
+                self.write()
             case 'CREATEFRAME':
                 self.createframe()
             case 'PUSHFRAME':
@@ -137,7 +172,6 @@ def main():
     source_handle = open(argument[0], 'r') if argument[0] is not None else sys.stdin
     input_handle = open(argument[1], 'r') if argument[1] is not None else sys.stdin
 
-
     try:
         tree = ET.parse(source_handle)
     except ET.ParseError:
@@ -157,7 +191,6 @@ def main():
         instruction_list.append(instruct_tmp)
 
     for instruct in instruction_list:
-        print('call switch with ' + instruct.opcode)
         instruction.instr_switch(instruct)
 
 
