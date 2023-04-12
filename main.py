@@ -10,7 +10,6 @@ class memory:
         'LF': list(),
         'TF': None
     }
-    memory_stack = list()
 
 
 class variable:
@@ -20,17 +19,61 @@ class variable:
 
 
 class instruction:
-    def __init__(self, name, number):
-        self.name = name
-        self.number = number
+    def __init__(self, order, opcode):
+        self.order = order
+        self.opcode = opcode
         self.args = []
 
     def add_argument(self, arg_type, value):
         self.args.append(value)
         self.args.append(variable(arg_type, value))
 
-    def move(self):
+    def check_frame(self, mem_frame):
+        if (mem_frame == 'TF' and memory.frames['TF'] is None) or \
+                (mem_frame == 'LF' and not memory.frames['LF']):
+            sys.stderr.write("Memory frame doesn't exist")
+            exit(55)
 
+    def check_var(self, mem_frame, var_name) -> bool:
+        self.check_frame(mem_frame)
+        match var_name:
+            case 'GF':
+                return var_name in memory.frames['GF'].keys()
+            case 'LF':
+                return var_name in memory.frames['LF'].pop().keys()
+            case 'TF':
+                return var_name in memory.frames['TF'].keys()
+        return False
+
+    def move(self):
+        print('MOVE IN PROGRESS')
+
+    def createframe(self):
+        memory.frames['TF'] = dict()
+
+    def pushframe(self):
+        if memory.frames['TF'] is None:
+            sys.stderr.write("No created frame to PUSHFRAME")
+            exit(55)
+        memory.frames['LF'].append(memory.frames['TF'])
+        memory.frames = None
+
+    def popframe(self):
+        if not memory.frames['LF']:
+            sys.stderr.write("No pushed TF to POP")
+            exit(55)
+        memory.frames['TF'] = memory.frames['LF'].pop()
+
+    def instr_switch(self):
+        match self.opcode:
+            case 'MOVE':
+                self.move()
+            case 'CREATEFRAME':
+                self.createframe()
+            case 'PUSHFRAME':
+                self.pushframe()
+            case 'POPFRAME':
+                self.popframe()
 
 
 def argument_parse(src, inp):
@@ -40,7 +83,7 @@ def argument_parse(src, inp):
     arguments = parser.parse_args()
     if arguments.inp is None and arguments.src is None:
         print("ERROR 10: Wrong arguments given")
-        sys.exit(10)
+        exit(10)
     return arguments.src, arguments.inp
 
 
@@ -57,7 +100,7 @@ def xml_check(root):
     currentOrder = 0
     for instruct in root:
         # Check if tag is instruction
-        if instruct.tag != 'instruction': sys.exit(31)
+        if instruct.tag != 'instruction': exit(31)
 
         # Check order of instructions
         currentOrder = int(instruct.get('order')) if int(instruct.get('order')) > currentOrder else sys.exit(
@@ -92,16 +135,20 @@ def main():
     except ET.ParseError:
         sys.exit("XML parse error")
 
-    root = tree.getroot()       # <program language>
+    root = tree.getroot()  # <program language>
     xml_check(root)
     # iterate instructions
-    for instruct in root:          # <instruction order= opcode=>
+    for instruct in root:  # <instruction order= opcode=>
         instruct_tmp = instruction(instruct.get('order'), instruct.get('opcode'))
 
         # Create instruction
         for argum in instruct:  # <arg type= >text
             instruct_tmp.add_argument(argum.get('type'), argum.text)
-        instruction_list.append(tmp)
+        instruction_list.append(instruct_tmp)
+
+    for instruct in instruction_list:
+        print('call switch with ' + instruct.opcode)
+        instruction.instr_switch(instruct)
 
 
 if __name__ == '__main__':
