@@ -25,8 +25,10 @@ class instruction:
         self.args = []
 
     def add_argument(self, arg_type, value):
-        self.args.append(value)
         self.args.append(variable(arg_type, value))
+
+    def get_args(self):
+        return self.args
 
     def check_frame(self, mem_frame):
         if (mem_frame == 'TF' and memory.frames['TF'] is None) or \
@@ -45,8 +47,13 @@ class instruction:
                 return var_name in memory.frames['TF'].keys()
         return False
 
+
     def move(self):
         print('MOVE IN PROGRESS')
+
+        for arg in self.args:
+            print(arg.value + " " + arg.type)
+
 
     def createframe(self):
         memory.frames['TF'] = dict()
@@ -66,7 +73,7 @@ class instruction:
 
     def instr_switch(self):
         match self.opcode:
-            case 'MOVE':
+            case 'MOVE':    # <var>  <=  <symb>
                 self.move()
             case 'CREATEFRAME':
                 self.createframe()
@@ -130,13 +137,16 @@ def main():
     source_handle = open(argument[0], 'r') if argument[0] is not None else sys.stdin
     input_handle = open(argument[1], 'r') if argument[1] is not None else sys.stdin
 
+
     try:
         tree = ET.parse(source_handle)
     except ET.ParseError:
         sys.exit("XML parse error")
 
     root = tree.getroot()  # <program language>
+    root[:] = sorted(root, key=lambda child: int(child.get('order')))
     xml_check(root)
+
     # iterate instructions
     for instruct in root:  # <instruction order= opcode=>
         instruct_tmp = instruction(instruct.get('order'), instruct.get('opcode'))
