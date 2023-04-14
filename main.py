@@ -4,9 +4,10 @@ import re
 import xml.etree.ElementTree as ET
 
 """
-TODO:
-move() symb/var
-
+TODO: 
+arithmetic operations type control 
+case sensitiveness
+call() - PC number 
 """
 
 
@@ -128,6 +129,9 @@ class Instruction:
         type, value = var.split('@', 1)
         return value
 
+    def create_var(self, type, value):
+        return type + "@" + value
+
     def symb_value(self, value):
         prefix, suffix = value.split("@", 1)
         # print('PREF: ' + prefix + ' SUF: ' + suffix)
@@ -173,7 +177,6 @@ class Instruction:
             error_exit(55, "Error 55: No frame to pop")
         Memory.frames['TF'] = Memory.frames['LF'].pop()
 
-    # TODO: Pochopit to
     def call(self):
         label = self.get_args()[0]
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Undefined label")
@@ -198,10 +201,51 @@ class Instruction:
         # print(Memory.__dict__)
 
     def add(self):
-        var = self.get_args()[0]
-        symb1 = self.get_args()[1]
-        symb2 = self.get_args()[2]
-        
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1 = int(self.symb_value(self.get_args()[1].value))
+        symb2 = int(self.symb_value(self.get_args()[2].value))
+        result = self.create_var("int", str(symb1 + symb2))
+        self.set_var_frame(mem_frame, var_name, result)
+        # print(Memory.__dict__)
+
+    def sub(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1 = int(self.symb_value(self.get_args()[1].value))
+        symb2 = int(self.symb_value(self.get_args()[2].value))
+        result = self.create_var("int", str(symb1 - symb2))
+        self.set_var_frame(mem_frame, var_name, result)
+
+    def mul(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1 = int(self.symb_value(self.get_args()[1].value))
+        symb2 = int(self.symb_value(self.get_args()[2].value))
+        result = self.create_var("int", str(symb1 * symb2))
+        self.set_var_frame(mem_frame, var_name, result)
+
+    def idiv(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1 = int(self.symb_value(self.get_args()[1].value))
+        symb2 = int(self.symb_value(self.get_args()[2].value))
+        if symb2 == 0: error_exit(57, "Error 57: Zero division")
+        result = self.create_var("int", str(symb1 // symb2))
+        self.set_var_frame(mem_frame, var_name, result)
+
 
     def instr_switch(self):
         match self.opcode:
@@ -240,7 +284,15 @@ class Instruction:
             case 'ADD':
                 self.check_arg_num(3)
                 self.add()
-
+            case 'SUB':
+                self.check_arg_num(3)
+                self.sub()
+            case 'MUL':
+                self.check_arg_num(3)
+                self.mul()
+            case 'IDIV':
+                self.check_arg_num(3)
+                self.idiv()
             # INSTRUCTION FOR I/O
             case 'WRITE':  # <symb>
                 self.check_arg_num(1)
