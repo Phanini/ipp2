@@ -22,7 +22,7 @@ def argument_parse(src, inp):
 
 
 def xml_check(root):
-    print('-------XML CHECK-------')
+    # print('-------XML CHECK-------')
     # Check if program tag exists
     if root.tag != 'program': return sys.exit('program tag error')
 
@@ -48,7 +48,7 @@ def xml_check(root):
         # Check if type attribute exists
         for argum in instruct:
             if 'type' not in argum.attrib.keys(): error_exit(31, "Error 31: Wrong XML file format (no type in arg)")
-    print('----------OK----------')
+    print('=XML OK=')
 
 
 def error_exit(err_num, err_msg):
@@ -86,10 +86,22 @@ class instruction:
         if num != len(self.args):
             error_exit(56, "Error 56: Wrong number of arguments")
 
-    def check_frame(self, mem_frame):
-        if (mem_frame == 'TF' and memory.frames['TF'] is None) or \
-                (mem_frame == 'LF' and not memory.frames['LF']):
-            error_exit(55, "Error 55: Memory frame doesn't exist")
+    def check_frame(self, mem_frame): # memory.frames[tf] is None
+        if mem_frame == 'TF' and memory.frames['TF'] is None:
+            error_exit(55, "TF Error 55: Memory frame doesn't exist")
+        if mem_frame == 'LF' and not memory.frames['LF']:
+            error_exit(55, "LF Error 55: Memory frame doesn't exist")
+
+    # Checks existence of variable and frame
+    def check_var(self, mem_frame, var_name) -> bool:
+        self.check_frame(mem_frame)
+        match mem_frame:
+            case 'GF' | 'TF':
+                return var_name in memory.frames[mem_frame].keys()
+            case 'LF':
+                return var_name in memory.frames['LF'][-1].keys()
+        return False
+        # error_exit(54, "Error 54: variable does not exist")
 
     def set_var_frame(self, frame, var_name, symb):
         if frame in ('GF', 'TF'):
@@ -98,18 +110,6 @@ class instruction:
             memory.frames['LF'][-1][var_name] = symb
         else:
             error_exit(55, "Error 55: Frame does not exist")
-
-    # Checks existance of variable and frame
-    def check_var(self, mem_frame, var_name) -> bool:
-        self.check_frame(mem_frame)
-        match mem_frame:
-            case 'GF':
-                return var_name in memory.frames['GF'].keys()
-            case 'LF':
-                return var_name in memory.frames['LF'].pop().keys()
-            case 'TF':
-                return var_name in memory.frames['TF'].keys()
-        error_exit(54, "Error 54: variable does not exist")
 
     def move(self):
         var = self.get_args()[0].value
@@ -120,29 +120,42 @@ class instruction:
 
     def write(self):
         result = self.symb_value(self.get_args()[0].value)
-        print(self.get_args()[0].value)
-        #print('WRITE RESULT: ' + result)
+        print('WRITE RESULT: ' + result)
+
+    def get_var_value(self, var):
+        type, value = var.split('@', 1)
+        return value
 
     def symb_value(self, value):
         prefix, suffix = value.split("@", 1)
-        print('PREF: ' + prefix + ' SUF: ' + suffix)
+        # print('PREF: ' + prefix + ' SUF: ' + suffix)
         if prefix not in ('GF', 'LF', 'TF'):
-            print("NOT GFLFTF")
             return suffix
+        if self.check_var(prefix, suffix) is False: error_exit(54, "Error 54: Non-existent var")
+
         match prefix:
-            case 'TF':
-                return memory.frames['TF'][suffix]
-            case 'GF':
-                return memory.frames['GF'][suffix]
+            case 'GF' | 'TF':
+                return self.get_var_value(memory.frames[prefix][suffix])
             case 'LF':
-                return memory.frames['LF'][-1][suffix]
+                return self.get_var_value(memory.frames['LF'][-1][suffix])
         sys.stderr.write('Wrong symb')
         exit()
 
     def defvar(self):
-        mem_frame, var_name = self.get_args().pop().split("@", 1)
-        self.check_var(mem_frame, var_name)
+        mem_frame, var_name = self.get_args()[0].value.split("@", 1)
+        if self.check_var(mem_frame, var_name):
+            error_exit(52, "Error 52: Variable re-definition")
 
+        # Init of an empty <var>
+        var = {var_name: variable(None, None)}
+
+        match mem_frame:
+            case 'GF' | 'TF':
+                memory.frames[mem_frame].update(var)
+            case 'LF':
+                memory.frames['LF'][-1].update(var)
+            case _:
+                error_exit(1, "Error ??: DEFVAR: Unknown var")
 
     def createframe(self):
         memory.frames['TF'] = dict()
@@ -152,7 +165,7 @@ class instruction:
             sys.stderr.write("No created frame to PUSHFRAME")
             exit(55)
         memory.frames['LF'].append(memory.frames['TF'])
-        memory.frames = None
+        memory.frames['TF'] = None
 
     def popframe(self):
         if not memory.frames['LF']:
@@ -167,6 +180,9 @@ class instruction:
                 self.move()
             case 'WRITE':  # <symb>
                 self.write()
+            case 'DEFVAR':  # <var>
+                self.check_arg_num(1)
+                self.defvar()
             case 'CREATEFRAME':
                 self.createframe()
             case 'PUSHFRAME':
