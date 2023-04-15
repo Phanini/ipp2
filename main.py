@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 """
 TODO: 
 arithmetic operations type control 
-case sensitiveness
 call() - PC number 
 """
 
@@ -88,6 +87,24 @@ class Instruction:
     def get_args(self):
         return self.args
 
+    def check_arg_types(self, symb1, symb2):
+        type1, value1 = symb1.value.split('@', 1)
+        type2, value2 = symb2.value.split('@', 1)
+        if type1 != type2:
+            error_exit(53, "Error 53: Wrong operand types")
+        if self.opcode != 'EQ':
+            if type1 == 'nil':
+                error_exit(53, "Error 53: nil operand")
+        if self.opcode in ('AND', 'OR'):
+            if type1 != 'bool':
+                error_exit(53, "Error 53: Wrong operand type")
+            return value1, value2
+        if type1 == 'int':
+            return int(value1), int(value2)
+        return symb1.value, symb2.value
+
+
+
     def check_arg_num(self, num):
         if num != len(self.args):
             error_exit(56, "Error 56: Wrong number of arguments")
@@ -137,7 +154,6 @@ class Instruction:
             print('', end='')
         else:
             print(suffix)
-
 
     def get_var_value(self, var):
         type, value = var.split('@', 1)
@@ -266,6 +282,90 @@ class Instruction:
         result = self.create_var("int", str(symb1 // symb2))
         self.set_var_frame(mem_frame, var_name, result)
 
+    def lt(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        if symb1 < symb2:
+            result = self.create_var('bool', 'true');
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            result = self.create_var('bool', 'false');
+            self.set_var_frame(mem_frame, var_name, result)
+
+    def gt(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        if symb1 > symb2:
+            result = self.create_var('bool', 'true');
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            result = self.create_var('bool', 'false');
+            self.set_var_frame(mem_frame, var_name, result)
+
+    def eq(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        if symb1 == symb2:
+            result = self.create_var('bool', 'true')
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            result = self.create_var('bool', 'false')
+            self.set_var_frame(mem_frame, var_name, result)
+
+    def and_ins(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        if symb1 and symb2:
+            result = self.create_var('bool', 'true')
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            result = self.create_var('bool', 'false')
+            self.set_var_frame(mem_frame, var_name, result)
+
+    def or_ins(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        if symb1 or symb2:
+            result = self.create_var('bool', 'true')
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            result = self.create_var('bool', 'false')
+            self.set_var_frame(mem_frame, var_name, result)
+
+    def not_ins(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        prefix, suffix = self.get_args()[1].value.split('@', 1)
+        if suffix == 'false':
+            result = self.create_var('bool', 'true')
+            self.set_var_frame(mem_frame,var_name, result)
+        else:
+            result = self.create_var('bool', 'false')
+            self.set_var_frame(mem_frame, var_name, result)
+
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -312,6 +412,24 @@ class Instruction:
             case 'IDIV':
                 self.check_arg_num(3)
                 self.idiv()
+            case 'LT':
+                self.check_arg_num(3)
+                self.lt()
+            case 'GT':
+                self.check_arg_num(3)
+                self.gt()
+            case 'EQ':
+                self.check_arg_num(3)
+                self.eq()
+            case 'AND':
+                self.check_arg_num(3)
+                self.and_ins()
+            case 'OR':
+                self.check_arg_num(3)
+                self.or_ins()
+            case 'NOT':
+                self.check_arg_num(2)
+                self.not_ins()
             # INSTRUCTION FOR I/O
             case 'WRITE':  # <symb>
                 self.check_arg_num(1)
