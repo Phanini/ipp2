@@ -72,6 +72,9 @@ class Variable:
         self.type = arg_type
         self.value = value
 
+    def check_var_empty(self):
+        return self.value is None and self.value is None
+
 
 class Instruction:
     def __init__(self, order, opcode):
@@ -117,13 +120,24 @@ class Instruction:
     def move(self):
         var = self.get_args()[0].value
         frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(frame, var_name): error_exit(54, "Error 54: Non-existent variable")
 
         symb = self.get_args()[1].value
         self.set_var_frame(frame, var_name, symb)
 
     def write(self):
-        result = self.symb_value(self.get_args()[0].value)
-        print(result)
+        var = self.get_args()[0]
+        if Variable.check_var_empty(var): error_exit(56, "Error 56: Variable without value to print")
+        prefix, suffix = (var.value).split('@', 1)
+        if prefix in ('GF', 'LF', 'TF'):
+            if not self.check_var_exists(prefix, suffix): error_exit(54, "Error 54: Non-existent variable")
+            print(self.symb_value(var.value))
+            return
+        if var.type == 'nil':
+            print('', end='')
+        else:
+            print(suffix)
+
 
     def get_var_value(self, var):
         type, value = var.split('@', 1)
@@ -134,18 +148,24 @@ class Instruction:
 
     def symb_value(self, value):
         prefix, suffix = value.split("@", 1)
-        # print('PREF: ' + prefix + ' SUF: ' + suffix)
         if prefix not in ('GF', 'LF', 'TF'):
             return suffix
         if self.check_var_exists(prefix, suffix) is False: error_exit(54, "Error 54: Non-existent var")
-
         match prefix:
             case 'GF' | 'TF':
-                return self.get_var_value(Memory.frames[prefix][suffix])
+                value = Memory.frames[prefix][suffix]
+                if type(value) == Variable:
+                    if Variable.check_var_empty(value): error_exit(56,"Error 56: Variable without value to print")
+                else:
+                    return self.get_var_value(value)
+
             case 'LF':
-                return self.get_var_value(Memory.frames['LF'][-1][suffix])
-        sys.stderr.write('Wrong symb')
-        exit()
+                value = Memory.frames['LF'][-1][suffix]
+                if type(value) == Variable:
+                    if Variable.check_var_empty(value): error_exit(56, "Error 56: Variable without valut to print")
+                else:
+                    return self.get_var_value(value)
+        error_exit(99, "Error 99: Symb_value() internal error")
 
     def defvar(self):
         mem_frame, var_name = self.get_args()[0].value.split("@", 1)
@@ -246,7 +266,6 @@ class Instruction:
         result = self.create_var("int", str(symb1 // symb2))
         self.set_var_frame(mem_frame, var_name, result)
 
-
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -313,7 +332,8 @@ def main():
         try:
             source_handle = open(argument[0], 'r')
         except FileNotFoundError:
-            error_exit(11, "Error 11: File does not exist")
+
+            error_exit(11, "Error 11: File "+argument[0]+" does not exist")
     else:
         source_handle = sys.stdin
 
@@ -336,7 +356,7 @@ def main():
 
     # iterate instructions
     for instruct in root:  # <instruction order= opcode=>
-        instruct_tmp = Instruction(instruct.get('order'), instruct.get('opcode'))
+        instruct_tmp = Instruction(instruct.get('order'), instruct.get('opcode').upper())
 
         # Create instruction
         for argum in instruct:  # <arg type= >text
