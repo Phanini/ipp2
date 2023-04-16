@@ -479,6 +479,30 @@ class Instruction:
         result = self.create_var('string', var_value)
         self.set_var_frame(mem_frame, var_name, result)
 
+    def type_inst(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        type1, value1 = self.symb_value(self.get_args()[1].value)
+        result = self.create_var('string', type1)
+        self.set_var_frame(mem_frame,var_name,result)
+
+    def label(self):
+        pass
+
+    def jump(self):
+        label = self.get_args()[0].value
+        if label not in Memory.labels.keys(): error_exit(52, "Error 52: Jump to an undefined label")
+        Memory.program_counter = Memory.labels[label]
+
+    def jumpifeq(self):
+        pass
+
+    def jumpifneq(self):
+        pass
+
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -570,6 +594,24 @@ class Instruction:
             case 'SETCHAR':
                 self.check_arg_num(3)
                 self.setchar()
+
+            # INSTRUCTIONS FOR TYPE-ING
+            case 'TYPE':
+                self.check_arg_num(2)
+                self.type_inst()
+            # INSTRUCTIONS FOR FLOW CONTROL
+            case 'LABEL':
+                self.check_arg_num(1)
+                self.label()
+            case 'JUMP':
+                self.check_arg_num(1)
+                self.jump()
+            case 'JUMPIFEQ':
+                self.check_arg_num(3)
+                self.jumpifeq()
+            case 'JUMPIFNEQ':
+                self.check_arg_num(3)
+                self.jumpifneq()
 
 def main():
     src = ''
