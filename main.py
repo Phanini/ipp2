@@ -3,13 +3,6 @@ import sys
 import re
 import xml.etree.ElementTree as ET
 
-"""
-TODO: 
-arithmetic operations type control 
-call() - PC number 
-"""
-
-
 def argument_parse(src, inp):
     parser = argparse.ArgumentParser(description='interpret.py ')
     parser.add_argument('--source=', action='store', dest='src', nargs='?')
@@ -62,7 +55,7 @@ class Memory:
     }
     labels = dict()
     instruction_stack = []
-    program_counter = 1
+    program_counter = 0
     data_stack = []
     input_handle = ''
 
@@ -497,12 +490,33 @@ class Instruction:
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Jump to an undefined label")
         Memory.program_counter = Memory.labels[label]
 
-    def jumpifeq(self):
-        pass
+    def jumpif(self):
+        label = self.get_args()[0].value
+        if label not in Memory.labels.keys(): error_exit(52, "Error 52: Undefinded label")
+        type1, value1 = self.symb_value(self.get_args()[1].value)
+        type2, value2 = self.symb_value(self.get_args()[2].value)
+        if type1 == type2 or (type1 == 'nil' or type2 == 'nil'):
+            if value1 == value2:
+                if self.opcode == 'JUMPIFEQ':
+                    Memory.program_counter = Memory.labels[label]
+            else:
+                if self.opcode == 'JUMPIFNEQ':
+                    Memory.program_counter = Memory.labels[label]
+        else:
+            error_exit(53, "Error 53: Wrong operand type")
 
-    def jumpifneq(self):
-        pass
+    def exit_inst(self):
+        type1, value1 = self.symb_value(self.get_args()[0])
+        if type1 != 'int': error_exit(53, "Error 53: Wrong operand type")
+        if int(value1) not in range(0, 50): error_exit(57, "Error 57: Invalid return code")
+        exit(int(value1))
 
+    def dprint(self):
+        type1, value1 = self.symb_value(self.get_args()[0].value)
+        sys.stderr.write(type1+'@'+value1)
+
+    def break_inst(self):
+        pass
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -606,12 +620,17 @@ class Instruction:
             case 'JUMP':
                 self.check_arg_num(1)
                 self.jump()
-            case 'JUMPIFEQ':
+            case 'JUMPIFEQ' | 'JUMPIFNEQ':
                 self.check_arg_num(3)
-                self.jumpifeq()
-            case 'JUMPIFNEQ':
-                self.check_arg_num(3)
-                self.jumpifneq()
+                self.jumpif()
+            case 'EXIT':
+                self.check_arg_num(1)
+                self.exit_inst()
+
+            # DEBUGING INSTRUCTIONS
+            case 'DPRINT':
+                self.check_arg_num(1)
+                self.dprint()
 
 def main():
     src = ''
@@ -659,8 +678,9 @@ def main():
         instruction_list.append(instruct_tmp)
 
     for instruct in instruction_list:
+        Memory.program_counter += 1
         Instruction.instr_switch(instruct)
-
+        print("PC:"+str(Memory.program_counter))
 
 if __name__ == '__main__':
     main()
