@@ -103,8 +103,6 @@ class Instruction:
             return int(value1), int(value2)
         return symb1.value, symb2.value
 
-
-
     def check_arg_num(self, num):
         if num != len(self.args):
             error_exit(56, "Error 56: Wrong number of arguments")
@@ -124,7 +122,6 @@ class Instruction:
             case 'LF':
                 return var_name in Memory.frames['LF'][-1].keys()
         return False
-        # error_exit(54, "Error 54: Variable does not exist")
 
     def set_var_frame(self, frame, var_name, symb):
         if frame in ('GF', 'TF'):
@@ -148,7 +145,8 @@ class Instruction:
         prefix, suffix = (var.value).split('@', 1)
         if prefix in ('GF', 'LF', 'TF'):
             if not self.check_var_exists(prefix, suffix): error_exit(54, "Error 54: Non-existent variable")
-            print(self.symb_value(var.value))
+            prefix, suffix = self.symb_value(var.value)
+            print(suffix)
             return
         if var.type == 'nil':
             print('', end='')
@@ -165,22 +163,24 @@ class Instruction:
     def symb_value(self, value):
         prefix, suffix = value.split("@", 1)
         if prefix not in ('GF', 'LF', 'TF'):
-            return suffix
+            return prefix, suffix
         if self.check_var_exists(prefix, suffix) is False: error_exit(54, "Error 54: Non-existent var")
         match prefix:
             case 'GF' | 'TF':
                 value = Memory.frames[prefix][suffix]
                 if type(value) == Variable:
-                    if Variable.check_var_empty(value): error_exit(56,"Error 56: Variable without value to print")
+                    if Variable.check_var_empty(value): error_exit(56, "Error 56: Variable without value to print")
                 else:
-                    return self.get_var_value(value)
+                    prefix, suffix = value.split('@', 1)
+                    return prefix, suffix
 
             case 'LF':
                 value = Memory.frames['LF'][-1][suffix]
                 if type(value) == Variable:
                     if Variable.check_var_empty(value): error_exit(56, "Error 56: Variable without valut to print")
                 else:
-                    return self.get_var_value(value)
+                    prefix, suffix = value.split('@', 1)
+                    return prefix, suffix
         error_exit(99, "Error 99: Symb_value() internal error")
 
     def defvar(self):
@@ -242,9 +242,10 @@ class Instruction:
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
 
-        symb1 = int(self.symb_value(self.get_args()[1].value))
-        symb2 = int(self.symb_value(self.get_args()[2].value))
-        result = self.create_var("int", str(symb1 + symb2))
+        pref1, value1 = self.symb_value(self.get_args()[1].value)
+        pref2, value2 = self.symb_value(self.get_args()[2].value)
+        value1, value2 = int(value1), int(value2)
+        result = self.create_var("int", str(value1 + value2))
         self.set_var_frame(mem_frame, var_name, result)
         # print(Memory.__dict__)
 
@@ -254,9 +255,10 @@ class Instruction:
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
 
-        symb1 = int(self.symb_value(self.get_args()[1].value))
-        symb2 = int(self.symb_value(self.get_args()[2].value))
-        result = self.create_var("int", str(symb1 - symb2))
+        pref1, value1 = self.symb_value(self.get_args()[1].value)
+        pref2, value2 = self.symb_value(self.get_args()[2].value)
+        value1, value2 = int(value1), int(value2)
+        result = self.create_var("int", str(value1 - value2))
         self.set_var_frame(mem_frame, var_name, result)
 
     def mul(self):
@@ -265,9 +267,10 @@ class Instruction:
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
 
-        symb1 = int(self.symb_value(self.get_args()[1].value))
-        symb2 = int(self.symb_value(self.get_args()[2].value))
-        result = self.create_var("int", str(symb1 * symb2))
+        pref1, value1 = self.symb_value(self.get_args()[1].value)
+        pref2, value2 = self.symb_value(self.get_args()[2].value)
+        value1, value2 = int(value1), int(value2)
+        result = self.create_var("int", str(value1 * value2))
         self.set_var_frame(mem_frame, var_name, result)
 
     def idiv(self):
@@ -276,10 +279,11 @@ class Instruction:
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
 
-        symb1 = int(self.symb_value(self.get_args()[1].value))
-        symb2 = int(self.symb_value(self.get_args()[2].value))
-        if symb2 == 0: error_exit(57, "Error 57: Zero division")
-        result = self.create_var("int", str(symb1 // symb2))
+        pref1, value1 = self.symb_value(self.get_args()[1].value)
+        pref2, value2 = self.symb_value(self.get_args()[2].value)
+        value1, value2 = int(value1), int(value2)
+        if value2 == 0: error_exit(57, "Error 57: Zero division")
+        result = self.create_var("int", str(value1 // value2))
         self.set_var_frame(mem_frame, var_name, result)
 
     def lt(self):
@@ -361,10 +365,23 @@ class Instruction:
         prefix, suffix = self.get_args()[1].value.split('@', 1)
         if suffix == 'false':
             result = self.create_var('bool', 'true')
-            self.set_var_frame(mem_frame,var_name, result)
+            self.set_var_frame(mem_frame, var_name, result)
         else:
             result = self.create_var('bool', 'false')
             self.set_var_frame(mem_frame, var_name, result)
+
+    def int2char(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        symb = self.get_args()[1].value
+        var_type, value = self.symb_value(symb)
+        if var_type != 'int': error_exit(53, "Error: Wrong operand type")
+        value = chr(int(value))
+        result = self.create_var('string', value)
+        self.set_var_frame(mem_frame, var_name, result)
 
     def instr_switch(self):
         match self.opcode:
@@ -430,6 +447,9 @@ class Instruction:
             case 'NOT':
                 self.check_arg_num(2)
                 self.not_ins()
+            case 'INT2CHAR':  # <var> <symb>
+                self.check_arg_num(2)
+                self.int2char()
             # INSTRUCTION FOR I/O
             case 'WRITE':  # <symb>
                 self.check_arg_num(1)
@@ -451,7 +471,7 @@ def main():
             source_handle = open(argument[0], 'r')
         except FileNotFoundError:
 
-            error_exit(11, "Error 11: File "+argument[0]+" does not exist")
+            error_exit(11, "Error 11: File " + argument[0] + " does not exist")
     else:
         source_handle = sys.stdin
 
