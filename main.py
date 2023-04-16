@@ -422,6 +422,63 @@ class Instruction:
         result = self.create_var(arg_type, result)
         self.set_var_frame(mem_frame, var_name, result)
 
+    def concat(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        type1, value1 = self.symb_value(self.get_args()[1].value)  # string@abce
+        type2, value2 = self.symb_value(self.get_args()[2].value)  # string@xyz
+        if type1 != 'string' or type2 != 'string':
+            error_exit(53, "Error 53: Wrong operand type")
+        result = value1+value2
+        result = self.create_var('string', result)
+        self.set_var_frame(mem_frame, var_name, result)
+
+    def strlen(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        type1, value1 = self.symb_value(self.get_args()[1].value)
+        if type1 != 'string': error_exit(53, "Error 53: Wrong operand type")
+        result = len(value1)
+        result = self.create_var('int', str(result))
+        self.set_var_frame(mem_frame, var_name, result)
+
+    def getchar(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        type1, value1 = self.symb_value(self.get_args()[1].value) # string@some
+        type2, value2 = self.symb_value(self.get_args()[2].value) # int@5
+
+        if type1 != 'string' or type2 != 'int': error_exit(53, "Error 53: Wrong operand type")
+        if int(value2) not in range(len(value1)): error_exit(58, "Error 58: Wrong string indexing")
+
+        result = value1[int(value2)]
+        result = self.create_var('string', result)
+        self.set_var_frame(mem_frame, var_name, result)
+
+    def setchar(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        var_type, var_value = self.symb_value(var)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        type1, value1 = self.symb_value(self.get_args()[1].value)  # int@5
+        type2, value2 = self.symb_value(self.get_args()[2].value)  # string@hello
+        if type1 != 'int' or type2 != 'string': error_exit(53, "Error 53: Wrong operand type")
+        if int(value1) not in range(len(var_value)): error_exit(58, "Error 58: Wrong string indexing")
+        if value2 == '': error_exit(58, "Error 58: Invalid string operation")
+        var_value = list(var_value)
+        var_value[int(value1)] = value2[0]
+        var_value = ''.join(var_value)
+        result = self.create_var('string', var_value)
+        self.set_var_frame(mem_frame, var_name, result)
+
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -500,6 +557,19 @@ class Instruction:
                 self.check_arg_num(1)
                 self.write()
 
+            # INSTRUCTION FOR STRING MANIPULATION
+            case 'CONCAT':
+                self.check_arg_num(3)
+                self.concat()
+            case 'STRLEN':
+                self.check_arg_num(2)
+                self.strlen()
+            case 'GETCHAR':
+                self.check_arg_num(3)
+                self.getchar()
+            case 'SETCHAR':
+                self.check_arg_num(3)
+                self.setchar()
 
 def main():
     src = ''
