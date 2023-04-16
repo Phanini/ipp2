@@ -294,10 +294,10 @@ class Instruction:
 
         symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
         if symb1 < symb2:
-            result = self.create_var('bool', 'true');
+            result = self.create_var('bool', 'true')
             self.set_var_frame(mem_frame, var_name, result)
         else:
-            result = self.create_var('bool', 'false');
+            result = self.create_var('bool', 'false')
             self.set_var_frame(mem_frame, var_name, result)
 
     def gt(self):
@@ -308,10 +308,10 @@ class Instruction:
 
         symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
         if symb1 > symb2:
-            result = self.create_var('bool', 'true');
+            result = self.create_var('bool', 'true')
             self.set_var_frame(mem_frame, var_name, result)
         else:
-            result = self.create_var('bool', 'false');
+            result = self.create_var('bool', 'false')
             self.set_var_frame(mem_frame, var_name, result)
 
     def eq(self):
@@ -383,6 +383,20 @@ class Instruction:
         result = self.create_var('string', value)
         self.set_var_frame(mem_frame, var_name, result)
 
+    def stri2int(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+
+        type1, value1 = self.symb_value(self.get_args()[1].value) # string@abce
+        type2, value2 = self.symb_value(self.get_args()[2].value) # int@3
+        if type1 != 'string' or type2 != 'int': error_exit(53, "Error 53: Wrong operand type")
+        if int(value2) not in range(len(value1)): error_exit(58, "Error 58: Wrong string action")
+        result = str(ord(value1[int(value2)]))
+        result = self.create_var('int', result)
+        self.set_var_frame(mem_frame, var_name, result)
+
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -450,6 +464,9 @@ class Instruction:
             case 'INT2CHAR':  # <var> <symb>
                 self.check_arg_num(2)
                 self.int2char()
+            case 'STRI2INT':
+                self.check_arg_num(3)
+                self.stri2int()
             # INSTRUCTION FOR I/O
             case 'WRITE':  # <symb>
                 self.check_arg_num(1)
