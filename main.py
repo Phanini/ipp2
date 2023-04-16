@@ -64,7 +64,7 @@ class Memory:
     instruction_stack = []
     program_counter = 1
     data_stack = []
-
+    input_handle = ''
 
 class Variable:
     def __init__(self, arg_type, value):
@@ -397,6 +397,31 @@ class Instruction:
         result = self.create_var('int', result)
         self.set_var_frame(mem_frame, var_name, result)
 
+    def read(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        arg_type = self.get_args()[1].value
+        if arg_type not in ('int', 'string', 'bool'): error_exit(53, "Error 53: Wrong operand type")
+        inpt = Memory.input_handle.readline().strip().replace('\n','')
+        try:
+            match arg_type:
+                case 'int':
+                    result = int(inpt)
+                case 'string':
+                    result = inpt
+                case 'bool':
+                    if inpt.lower() == 'true':
+                        result = 'true'
+                    else:
+                        result = 'false'
+        except ValueError:
+            arg_type='nil'
+
+        result = self.create_var(arg_type, result)
+        self.set_var_frame(mem_frame, var_name, result)
+
     def instr_switch(self):
         match self.opcode:
             # INSTRUCTIONS FOR FRAMES, CALLS
@@ -468,6 +493,9 @@ class Instruction:
                 self.check_arg_num(3)
                 self.stri2int()
             # INSTRUCTION FOR I/O
+            case 'READ':
+                self.check_arg_num(2)
+                self.read()
             case 'WRITE':  # <symb>
                 self.check_arg_num(1)
                 self.write()
@@ -494,11 +522,11 @@ def main():
 
     if argument[1] is not None:
         try:
-            input_handle = open(argument[0], 'r')
+            Memory.input_handle = open(argument[0], 'r')
         except FileNotFoundError:
             error_exit(11, "Error 11: File does not exist")
     else:
-        input_handle = sys.stdin
+        Memory.input_handle = sys.stdin
 
     try:
         tree = ET.parse(source_handle)
