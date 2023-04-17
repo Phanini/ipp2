@@ -39,6 +39,7 @@ def xml_check(root):
             error_exit(31, 'Error 31: Wrong XML file format (order/opcode)')
 
         # Check if type attribute exists
+        arg_order = 1
         for argum in instruct:
             if 'type' not in argum.attrib.keys(): error_exit(31, "Error 31: Wrong XML file format (no type in arg)")
 
@@ -139,7 +140,7 @@ class Instruction:
         if symb1.type == 'nil':
             print('', end='')
         else:
-            print(self.symb_value(symb1))
+            print(self.symb_value(symb1), end='')
 
     def get_var_value(self, var):
         type, value = var.split('@', 1)
@@ -155,7 +156,7 @@ class Instruction:
             if not re.match('^(GF|TF|LF){1}@{1}\S+$', symb.value):
                 error_exit(32, "Error 32: Wrong XML formatting")
             mem_frame, var_name = symb.value.split('@', 1)
-            if not self.check_var_exists(mem_frame,var_name):error_exit(54, "Error 54: Non-existent var")
+            if not self.check_var_exists(mem_frame, var_name): error_exit(54, "Error 54: Non-existent var")
             match mem_frame:
                 case 'GF' | 'TF':
                     value = Memory.frames[mem_frame][var_name]
@@ -220,7 +221,7 @@ class Instruction:
         label = self.get_args()[0]
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Undefined label")
         Memory.instruction_stack.append(Memory.program_counter)
-        Memory.program_counter = Memory.labels[label];
+        Memory.program_counter = Memory.labels[label]
 
     def return_ins(self):
         if not Memory.instruction_stack: error_exit(56, "Error 56: Missing value on instruction stack")
@@ -232,7 +233,7 @@ class Instruction:
         # print(Memory.__dict__)
 
     def pops(self):
-        if not Memory.data_stack: error_exit(56, "Error 56: Pops from empty stack")
+        if not Memory.data_stack: error_exit(55, "Error 55: Pops from empty stack")
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         value = Memory.data_stack.pop()
@@ -247,21 +248,23 @@ class Instruction:
 
         symb1 = self.get_args()[1]
         symb2 = self.get_args()[2]
-        if symb1.type not in ('int', 'float') or symb2.type not in ('int', 'float'):
-            error_exit(53, "Err53: wrong op type")
         value1 = self.symb_value(symb1)
         value2 = self.symb_value(symb2)
+        try:
+            value1, value2 = int(value1), int(value2)
+        except ValueError:
+            error_exit(53, "err53: wrong operand type")
 
-        value1, value2 = int(value1), int(value2)
         match self.opcode:
             case 'ADD':
-                result = self.create_var("int", str(value1 + value2))
+                result = str(value1 + value2)
             case 'SUB':
-                result = self.create_var("int", str(value1 - value2))
+                result = str(value1 - value2)
             case 'MUL':
-                result = self.create_var("int", str(value1 * value2))
+                result = str(value1 * value2)
             case 'IDIV':
-                result = self.create_var("int", str(value1 // value2))
+                if value2==0: error_exit(57, "Error 57: Zero division")
+                result = str(value1 // value2)
         self.set_var_frame(mem_frame, var_name, result)
         # print(Memory.__dict__)
 
@@ -459,7 +462,7 @@ class Instruction:
     def jump(self):
         label = self.get_args()[0].value
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Jump to an undefined label")
-        Memory.program_counter = Memory.labels[label]
+        Memory.program_counter = Memory.labels[label] - 1
 
     def jumpif(self):
         label = self.get_args()[0].value
@@ -469,20 +472,17 @@ class Instruction:
 
         value1 = self.symb_value(symb1)
         value2 = self.symb_value(symb2)
-        if symb1.type == symb2.type or (symb1.type == 'nil' or symb2.type == 'nil'):
-            if value1 == value2:
-                if self.opcode == 'JUMPIFEQ':
-                    Memory.program_counter = Memory.labels[label]
-            else:
-                if self.opcode == 'JUMPIFNEQ':
-                    Memory.program_counter = Memory.labels[label]
+        if value1 == value2:
+            if self.opcode == 'JUMPIFEQ':
+                Memory.program_counter = Memory.labels[label] - 1
         else:
-            error_exit(53, "Error 53: Wrong operand type")
+            if self.opcode == 'JUMPIFNEQ':
+                Memory.program_counter = Memory.labels[label] - 1
 
     def exit_inst(self):
         symb1 = self.get_args()[0]
         value1 = self.symb_value(symb1)
-        if symb1.value != 'int': error_exit(53, "Error 53: Wrong operand type")
+        if symb1.type != 'int': error_exit(53, "Error 53: Wrong operand type")
         if int(value1) not in range(0, 50): error_exit(57, "Error 57: Invalid return code")
         exit(int(value1))
 
@@ -634,10 +634,18 @@ def main():
             instruct_tmp.add_argument(argum.get('type'), argum.text)
         instruction_list.append(instruct_tmp)
 
+    order=0
     for instruct in instruction_list:
+        if instruct.opcode == "LABEL":
+            if instruct.get_args()[0].value in Memory.labels.keys():
+                error_exit(52, "Err52: label redefinition")
+            Memory.labels[instruct.get_args()[0].value] = order
+        order += 1
+
+    for i in range(0, len(instruction_list)):
+        Instruction.instr_switch(instruction_list[i])
         Memory.program_counter += 1
-        Instruction.instr_switch(instruct)
-        #print("PC:" + str(Memory.program_counter))
+
 
 
 if __name__ == '__main__':
