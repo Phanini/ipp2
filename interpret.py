@@ -36,7 +36,7 @@ def xml_check(root):
         instruction_attribs = list(instruct.attrib.keys())
         # Check if both order and opcode exist
         if not ('order' in instruction_attribs) or not ('opcode' in instruction_attribs):
-            error_exit(31, 'Error 31: Wrong XML file format (order/opcode)')
+            error_exit(32, 'Error 32: Wrong XML file format (order/opcode)')
 
         # Check if type attribute exists
         arg_order = 1
@@ -137,7 +137,6 @@ class Instruction:
 
     def write(self):
         symb1 = self.symb_value(self.get_args()[0])
-        #print(symb1.value+symb1.type+str(type(symb1.value)))
         if symb1.type == 'nil':
             print('', end='')
         elif symb1.type == 'float':
@@ -241,23 +240,31 @@ class Instruction:
                 var1 = self.symb_value(Memory.data_stack.pop())
             except IndexError:
                 error_exit(56, "Error 56: Popping from empty stack")
-        if var1.type not in ('int','float') or var2.type not in ('int', 'float'): error_exit(53, "err53: wrong operand type")
-        try:
-            value1, value2 = int(var1.value), int(var2.value)
-        except ValueError:
-            error_exit(32, "Error 32: Wrong operand")
+        if var1.type not in ('int', 'float') or var2.type not in ('int', 'float'): error_exit(53, "err53: wrong operand type")
+        if var1.type != var2.type: error_exit(53, "Error 53: Wrong operands")
+        value1 = var1.value
+        value2 = var2.value
+        if var1.type == 'int':
+            try:
+                value1, value2 = int(var1.value), int(var2.value)
+            except ValueError:
+                error_exit(32, "Error 32: Wrong operand")
+
         match self.opcode:
             case 'ADD' | 'ADDS':
-                result = str(value1 + value2)
+                result = value1 + value2
             case 'SUB' | 'SUBS':
-                result = str(value1 - value2)
+                result = value1 - value2
             case 'MUL' | 'MULS':
-                result = str(value1 * value2)
+                result = value1 * value2
             case 'IDIV' | 'IDIVS':
                 if value2 == 0: error_exit(57, "Error 57: Zero division")
-                result = str(value1 // value2)
+                result = value1 // value2
+            case 'DIV':
+                if value2 == 0: error_exit(57, "Error 57: Zero division")
+                result = value1 / value2
         if stack_flag == 1:
-            self.set_var_frame(mem_frame, var_name, 'int',result)
+            self.set_var_frame(mem_frame, var_name, var1.type, result)
         else:
             tmp = Variable('int', result)
             Memory.data_stack.append(tmp)
@@ -348,6 +355,26 @@ class Instruction:
         else:
             Memory.data_stack.append(Variable('string', value))
 
+    def int2float(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        symb = self.get_args()[1]
+        var1 = self.symb_value(symb)
+        if var1.type != 'int': error_exit(53, "Error 53: Wrong operand type")
+        self.set_var_frame(mem_frame, var_name, 'float', float(var1.value))
+
+    def float2int(self):
+        var = self.get_args()[0].value
+        mem_frame, var_name = var.split('@', 1)
+        if not self.check_var_exists(mem_frame, var_name):
+            error_exit(54, "Error 54: Non-existent variable")
+        symb = self.get_args()[1]
+        var1 = self.symb_value(symb)
+        if var1.type != 'float': error_exit(53, "Error 53: Wrong operand type")
+        self.set_var_frame(mem_frame, var_name, 'int', int(var1.value))
+
     def stri2int(self, stack_flag):
         if stack_flag == 1:
             var = self.get_args()[0].value
@@ -380,12 +407,14 @@ class Instruction:
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
         arg_type = self.get_args()[1].value
-        if arg_type not in ('int', 'string', 'bool'): error_exit(53, "Error 53: Wrong operand type")
+        if arg_type not in ('int', 'string', 'bool', 'float'): error_exit(53, "Error 53: Wrong operand type")
         inpt = Memory.input_handle.readline().strip().replace('\n', '')
         try:
             match arg_type:
                 case 'int':
                     result = int(inpt)
+                case 'float':
+                    result = hex(inpt)
                 case 'string':
                     result = inpt
                 case 'bool':
@@ -396,8 +425,6 @@ class Instruction:
         except ValueError:
             arg_type = 'nil'
             result = ''
-
-        result = self.create_var(arg_type, result)
         self.set_var_frame(mem_frame, var_name, arg_type, result)
 
     def concat(self):
@@ -563,7 +590,7 @@ class Instruction:
                 self.pops()
 
             # INSTRUCTION FOR ARITHMETIC, RELATIONAL, BOOLEAN AND CONVERSION
-            case 'ADD' | 'SUB' | 'MUL' | 'IDIV':
+            case 'ADD' | 'SUB' | 'MUL' | 'IDIV' | 'DIV':
                 self.check_arg_num(3)
                 self.add_sub_mul_idiv(1)
             case 'ADDS' | 'SUBS' | 'MULS' | 'IDIVS':
@@ -593,6 +620,12 @@ class Instruction:
             case 'STRI2INTS':
                 self.check_arg_num(0)
                 self.stri2int(0)
+            case 'INT2FLOAT':
+                self.check_arg_num(2)
+                self.int2float()
+            case 'FLOAT2INT':
+                self.check_arg_num(2)
+                self.float2int()
             # INSTRUCTION FOR I/O
             case 'READ':
                 self.check_arg_num(2)
@@ -700,6 +733,7 @@ def main():
         order += 1
 
     while Memory.program_counter != len(instruction_list):
+        #print(Memory.program_counter)
         Instruction.instr_switch(instruction_list[Memory.program_counter])
         Memory.program_counter += 1
 
