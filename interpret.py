@@ -162,9 +162,9 @@ class Instruction:
                     value = Memory.frames[mem_frame][var_name]
                     if type(value) == Variable:
                         if Variable.check_var_empty(value): error_exit(56, "Error 56: Variable without value to print")
+                        return value.value
                     else:
                         return value
-
                 case 'LF':
                     value = Memory.frames['LF'][-1][var_name]
                     if type(value) == Variable:
@@ -185,7 +185,7 @@ class Instruction:
                     if symb.value != 'nil':
                         error_exit(32, "Err32: Wrong nil format")
             return symb.value
-        error_exit(99, "Error 99: Symb_value() internal error")
+        error_exit(99, "Error 99: Symb_value() internal error " + str(Memory.program_counter))
 
     def defvar(self):
         mem_frame, var_name = self.get_args()[0].value.split("@", 1)
@@ -228,89 +228,86 @@ class Instruction:
         Memory.program_counter = Memory.instruction_stack.pop()
 
     def pushs(self):
-        value = self.get_args()[0].value
+        value = self.get_args()[0]
         Memory.data_stack.append(value)
-        # print(Memory.__dict__)
 
     def pops(self):
-        if not Memory.data_stack: error_exit(55, "Error 55: Pops from empty stack")
+        if not Memory.data_stack: error_exit(56, "Error 56: Pops from empty stack")
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         value = Memory.data_stack.pop()
         self.set_var_frame(mem_frame, var_name, value)
-        # print(Memory.__dict__)
 
-    def add_sub_mul_idiv(self):
-        var = self.get_args()[0].value
-        mem_frame, var_name = var.split('@', 1)
-        if not self.check_var_exists(mem_frame, var_name):
-            error_exit(54, "Error 54: Non-existent variable")
-
-        symb1 = self.get_args()[1]
-        symb2 = self.get_args()[2]
-        value1 = self.symb_value(symb1)
-        value2 = self.symb_value(symb2)
+    def add_sub_mul_idiv(self, stack_flag):
+        if stack_flag == 1:
+            var = self.get_args()[0].value
+            mem_frame, var_name = var.split('@', 1)
+            if not self.check_var_exists(mem_frame, var_name):
+                error_exit(54, "Error 54: Non-existent variable")
+            symb1 = self.get_args()[1]
+            symb2 = self.get_args()[2]
+            value1 = self.symb_value(symb1)
+            value2 = self.symb_value(symb2)
+        else:
+            value2 = self.symb_value(Memory.data_stack.pop())
+            value1 = self.symb_value(Memory.data_stack.pop())
         try:
             value1, value2 = int(value1), int(value2)
         except ValueError:
             error_exit(53, "err53: wrong operand type")
 
         match self.opcode:
-            case 'ADD':
+            case 'ADD' | 'ADDS':
                 result = str(value1 + value2)
-            case 'SUB':
+            case 'SUB' | 'SUBS':
                 result = str(value1 - value2)
-            case 'MUL':
+            case 'MUL' | 'MULS':
                 result = str(value1 * value2)
-            case 'IDIV':
-                if value2==0: error_exit(57, "Error 57: Zero division")
+            case 'IDIV' | 'IDIVS':
+                if value2 == 0: error_exit(57, "Error 57: Zero division")
                 result = str(value1 // value2)
-        self.set_var_frame(mem_frame, var_name, result)
-        # print(Memory.__dict__)
+        if stack_flag == 1:
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            tmp = Variable('int', result)
+            Memory.data_stack.append(result)
 
-    def lt_gt_eq_and_or(self):
-        var = self.get_args()[0].value
-        mem_frame, var_name = var.split('@', 1)
-        if not self.check_var_exists(mem_frame, var_name):
-            error_exit(54, "Error 54: Non-existent variable")
-
-        symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+    def lt_gt_eq_and_or(self, stack_flag):
+        if stack_flag == 1:
+            var = self.get_args()[0].value
+            mem_frame, var_name = var.split('@', 1)
+            if not self.check_var_exists(mem_frame, var_name):
+                error_exit(54, "Error 54: Non-existent variable")
+            symb1, symb2 = self.check_arg_types(self.get_args()[1], self.get_args()[2])
+        else:
+            try:
+                var2 = Memory.data_stack.pop()
+                var1 = Memory.data_stack.pop()
+                symb2 = self.symb_value(var2)
+                symb1 = self.symb_value(var1)
+                if self.opcode not in ('EQ', 'EQS') and (symb1 == 'nil' or symb2 == 'nil'):
+                    error_exit(53, "Err53: nil operand")
+                if self.opcode not in ('EQ', 'EQS'):
+                    if var1.type != var2.type:
+                        error_exit(53, "Error 53: Wrong operands")
+            except IndexError:
+                error_exit(56, str(Memory.program_counter) + "Error 56: LTSGTSEQSANDS Pop from empty stack")
         match self.opcode:
-            case 'LT':
-                if symb1 < symb2:
-                    result = self.create_var('bool', 'true')
-                    self.set_var_frame(mem_frame, var_name, result)
-                else:
-                    result = self.create_var('bool', 'false')
-                    self.set_var_frame(mem_frame, var_name, result)
-            case 'GT':
-                if symb1 > symb2:
-                    result = self.create_var('bool', 'true')
-                    self.set_var_frame(mem_frame, var_name, result)
-                else:
-                    result = self.create_var('bool', 'false')
-                    self.set_var_frame(mem_frame, var_name, result)
-            case 'EQ':
-                if symb1 == symb2:
-                    result = self.create_var('bool', 'true')
-                    self.set_var_frame(mem_frame, var_name, result)
-                else:
-                    result = self.create_var('bool', 'false')
-                    self.set_var_frame(mem_frame, var_name, result)
-            case 'AND':
-                if symb1 and symb2:
-                    result = self.create_var('bool', 'true')
-                    self.set_var_frame(mem_frame, var_name, result)
-                else:
-                    result = self.create_var('bool', 'false')
-                    self.set_var_frame(mem_frame, var_name, result)
-            case 'OR':
-                if symb1 or symb2:
-                    result = self.create_var('bool', 'true')
-                    self.set_var_frame(mem_frame, var_name, result)
-                else:
-                    result = self.create_var('bool', 'false')
-                    self.set_var_frame(mem_frame, var_name, result)
+            case 'LT' | 'LTS':
+                result = 'true' if symb1 < symb2 else 'false'
+            case 'GT' | 'GTS':
+                result = 'true' if symb1 > symb2 else 'false'
+            case 'EQ' | 'EQS':
+                result = 'true' if symb1 == symb2 else 'false'
+            case 'AND' | 'ANDS':
+                result = 'true' if symb1 == 'true' and symb2 == 'true' else 'false'
+            case 'OR' | 'ORS':
+                result = 'true' if symb1 == 'true' or symb2 == 'true' else 'false'
+        if stack_flag == 1:
+            result = self.create_var('bool', str(result))
+            self.set_var_frame(mem_frame, var_name, result)
+        else:
+            Memory.data_stack.append(Variable('bool', result))
 
     def not_ins(self):
         var = self.get_args()[0].value
@@ -344,8 +341,8 @@ class Instruction:
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
-        symb1=self.get_args()[1]
-        symb2=self.get_args()[2]
+        symb1 = self.get_args()[1]
+        symb2 = self.get_args()[2]
 
         value1 = self.symb_value(symb1)  # string@abce
         value2 = self.symb_value(symb2)  # int@3
@@ -376,6 +373,7 @@ class Instruction:
                         result = 'false'
         except ValueError:
             arg_type = 'nil'
+            result = ''
 
         result = self.create_var(arg_type, result)
         self.set_var_frame(mem_frame, var_name, result)
@@ -530,13 +528,22 @@ class Instruction:
             # INSTRUCTION FOR ARITHMETIC, RELATIONAL, BOOLEAN AND CONVERSION
             case 'ADD' | 'SUB' | 'MUL' | 'IDIV':
                 self.check_arg_num(3)
-                self.add_sub_mul_idiv()
+                self.add_sub_mul_idiv(1)
+            case 'ADDS' | 'SUBS' | 'MULS' | 'IDIVS':
+                self.check_arg_num(0)
+                self.add_sub_mul_idiv(0)
             case 'LT' | 'GT' | 'EQ' | 'AND' | 'OR':
                 self.check_arg_num(3)
-                self.lt_gt_eq_and_or()
+                self.lt_gt_eq_and_or(1)
+            case 'LTS' | 'GTS' | 'EQS' | 'ANDS' | 'ORS':
+                self.check_arg_num(0)
+                self.lt_gt_eq_and_or(0)
             case 'NOT':
                 self.check_arg_num(2)
-                self.not_ins()
+                self.not_ins(1)
+            case 'NOTS':
+                self.check_arg_num(0)
+                self.not_ins(0)
             case 'INT2CHAR':  # <var> <symb>
                 self.check_arg_num(2)
                 self.int2char()
@@ -614,6 +621,8 @@ def main():
             error_exit(11, "Error 11: File does not exist")
     else:
         Memory.input_handle = sys.stdin
+    if Memory.input_handle==sys.stdin and source_handle==sys.stdin:
+        error_exit(56, "Err56: Missing file")
 
     # Parse XML code
     try:
@@ -622,11 +631,12 @@ def main():
         sys.exit("XML parse error")
 
     root = tree.getroot()  # <program language>
-    root[:] = sorted(root, key=lambda child: int(child.get('order'))) # Order instructions
-    xml_check(root) # Check XML formatting
+    root[:] = sorted(root, key=lambda child: int(child.get('order')))  # Order instructions
+    xml_check(root)  # Check XML formatting
 
     # iterate instructions
     for instruct in root:  # <instruction order= opcode=>
+        instruct[:] = sorted(instruct, key=lambda instruct: (instruct.tag))
         instruct_tmp = Instruction(instruct.get('order'), instruct.get('opcode').upper())
 
         # Add arguments to instructions and append them to instruction_list
@@ -634,7 +644,7 @@ def main():
             instruct_tmp.add_argument(argum.get('type'), argum.text)
         instruction_list.append(instruct_tmp)
 
-    order=0
+    order = 0
     for instruct in instruction_list:
         if instruct.opcode == "LABEL":
             if instruct.get_args()[0].value in Memory.labels.keys():
@@ -645,7 +655,6 @@ def main():
     for i in range(0, len(instruction_list)):
         Instruction.instr_switch(instruction_list[i])
         Memory.program_counter += 1
-
 
 
 if __name__ == '__main__':
