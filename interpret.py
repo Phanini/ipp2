@@ -133,7 +133,6 @@ class Instruction:
         if not self.check_var_exists(frame, var_name): error_exit(54, "Error 54: Non-existent variable")
 
         symb = self.symb_value(self.get_args()[1])
-
         self.set_var_frame(frame, var_name, symb.type, symb.value)
 
     def write(self):
@@ -142,7 +141,7 @@ class Instruction:
         if symb1.type == 'nil':
             print('', end='')
         elif symb1.type == 'float':
-            print(float.hex(float.fromhex(symb1.value)), end='')
+            print(symb1.value.hex(), end='')
         else:
             res_without_escape = re.sub(r'\\[0-9]{3}', lambda match : chr(int(match.group().replace('\\', ''))), str(symb1.value))
             print(res_without_escape, end='')
@@ -170,21 +169,10 @@ class Instruction:
                     value = Memory.frames['LF'][-1][var_name]
                     return value
         else:
+            if symb.type == 'float':
+                float_val = float.fromhex(symb.value)
+                return Variable('float', float_val)
             return symb
-            '''match symb.type:
-                case 'int':
-                    try:
-                        int(symb.value)
-                    except ValueError:
-                        error_exit(32, "Err32: Wrong int format")
-                case 'float':
-                    if not re.match('^\-?[0-9]*\.?[0-9]*$', symb.value):
-                        error_exit(32, "Err32: Wrong float format")
-                    return float.fromhex(symb.value)
-                case 'nil':
-                    if symb.value != 'nil':
-                        error_exit(32, "Err32: Wrong nil format")
-            return symb.value'''
 
     def defvar(self):
         mem_frame, var_name = self.get_args()[0].value.split("@", 1)
@@ -253,7 +241,7 @@ class Instruction:
                 var1 = self.symb_value(Memory.data_stack.pop())
             except IndexError:
                 error_exit(56, "Error 56: Popping from empty stack")
-        if var1.type != 'int' or var2.type != 'int': error_exit(53, "err53: wrong operand type")
+        if var1.type not in ('int','float') or var2.type not in ('int', 'float'): error_exit(53, "err53: wrong operand type")
         try:
             value1, value2 = int(var1.value), int(var2.value)
         except ValueError:
