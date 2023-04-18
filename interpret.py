@@ -3,12 +3,12 @@ import sys
 import re
 import xml.etree.ElementTree as ET
 
-'''
-Function parsing arguments from commandline
 
-Return: touple of input and source
-'''
 def argument_parse(src, inp):
+    """
+    Function parsing arguments from commandline
+    Return: touple of input and source
+    """
     parser = argparse.ArgumentParser(description='interpret.py ')
     parser.add_argument('--source=', action='store', dest='src', nargs='?')
     parser.add_argument('--input=', action='store', dest='inp', nargs='?')
@@ -18,12 +18,12 @@ def argument_parse(src, inp):
     return arguments.src, arguments.inp
 
 
-'''
-Function checking XML structures and their validity
-Input: root
-Return: root
-'''
 def xml_check(root):
+    """
+    Function checking XML structures and their validity
+    Input: XML root
+    Return: root
+    """
     # Check if program tag exists
     if root.tag != 'program': return error_exit(32, "Error 32: Wrong root tag")
 
@@ -67,7 +67,7 @@ def xml_check(root):
                 case _:
                     error_exit(32, "Error 32: Unknown tag")
             # Check if type attribute exists
-            if 'type' not in argum.attrib.keys(): error_exit(31, "Error 31: Wrong XML file format (no type in arg)")
+            if 'type' not in argum.attrib.keys(): error_exit(32, "Error 31: Wrong XML file format (no type in arg)")
         if arg2_flag == 'true' and arg1_flag == 'false': error_exit(32, "Error 32: XML arg2 without arg1")
         if arg3_flag == 'true' and (arg1_flag == 'false' or arg2_flag == 'false'):
             error_exit(32, "Error 32: XML arg2 without arg1")
@@ -162,15 +162,16 @@ class Instruction:
                 return var_name in Memory.frames[mem_frame].keys()
             case 'LF':
                 return var_name in Memory.frames['LF'][-1].keys()
-        return False
+            case _:
+                error_exit(55, "Error 55: Non-existent frame")
 
     def set_var_frame(self, frame, var_name, symb_type, symb_value):
         """
         Takes destination variable and sets new values given in symb_type and symb_value
-        :param frame: string
-        :param var_name: string
-        :param symb_type: string
-        :param symb_value: string/int/float/bool/nil
+        :param frame: target frame
+        :param var_name: target name
+        :param symb_type: type of value
+        :param symb_value: value of type string/int/float/bool/nil
         :return:
         """
         if frame in ('GF', 'TF'):
@@ -246,7 +247,6 @@ class Instruction:
 
         # Init of an empty <var>
         var = {var_name: Variable(None, None)}
-
         match mem_frame:
             case 'GF' | 'TF':
                 Memory.frames[mem_frame].update(var)
@@ -396,9 +396,11 @@ class Instruction:
             case 'EQ' | 'EQS':
                 result = 'true' if symb1.value == symb2.value else 'false'
             case 'AND' | 'ANDS':
+                # Check types
                 if symb1.type != 'bool' or symb2.type != 'bool': error_exit(53, "Error 53: Wrong operand type")
                 result = 'true' if symb1.value == 'true' and symb2.value == 'true' else 'false'
             case 'OR' | 'ORS':
+                # Check types
                 if symb1.type != 'bool' or symb2.type != 'bool': error_exit(53, "Error 53: Wrong operand type")
                 result = 'true' if symb1.value == 'true' or symb2.value == 'true' else 'false'
 
@@ -472,7 +474,7 @@ class Instruction:
             Memory.data_stack.append(Variable('string', value))
 
     def int2float(self):
-        """Converts int to float"""
+        """BONUS IMPLEMENTATION: Converts int to float"""
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
@@ -485,7 +487,7 @@ class Instruction:
         self.set_var_frame(mem_frame, var_name, 'float', float(var1.value))
 
     def float2int(self):
-        """Converts float to int"""
+        """BONUS IMPLEMENTATION: Converts float to int"""
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
@@ -532,14 +534,18 @@ class Instruction:
             Memory.data_stack.append(Variable('int', result))
 
     def read(self):
+        # Parse target var
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
             error_exit(54, "Error 54: Non-existent variable")
         arg_type = self.get_args()[1].value
         if arg_type not in ('int', 'string', 'bool', 'float'): error_exit(53, "Error 53: Wrong operand type")
+
+        # Read from input
         inpt = Memory.input_handle.readline().strip().replace('\n', '')
         try:
+            # Convert input to correct type and store into var
             match arg_type:
                 case 'int':
                     result = int(inpt)
@@ -558,6 +564,7 @@ class Instruction:
         self.set_var_frame(mem_frame, var_name, arg_type, result)
 
     def concat(self):
+        """Concatenate two strings and store result in var"""
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
@@ -572,6 +579,7 @@ class Instruction:
         self.set_var_frame(mem_frame, var_name, 'string', result)
 
     def strlen(self):
+        """Get length of symb1 and store in var"""
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
@@ -604,7 +612,7 @@ class Instruction:
         self.set_var_frame(mem_frame, var_name, 'string', result)
 
     def setchar(self):
-
+        """Change string<var>'s int<symb1>-th char to char<symb2> """
         var = self.get_args()[0]
         try:
             mem_frame, var_name = var.value.split('@', 1)
@@ -627,6 +635,7 @@ class Instruction:
         self.set_var_frame(mem_frame, var_name, 'string', var_value)
 
     def type_inst(self):
+        """Automatically detect type of symb and return it to var"""
         var = self.get_args()[0].value
         mem_frame, var_name = var.split('@', 1)
         if not self.check_var_exists(mem_frame, var_name):
@@ -644,11 +653,13 @@ class Instruction:
         pass
 
     def jump(self):
+        """Unconditional jump to label"""
         label = self.get_args()[0].value
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Jump to an undefined label")
         Memory.program_counter = Memory.labels[label] - 1
 
     def jumpif(self, stack_flag):
+        """Variations of jump-if-equal and their stack versions"""
         label = self.get_args()[0].value
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Undefinded label")
 
@@ -679,6 +690,7 @@ class Instruction:
                 Memory.program_counter = Memory.labels[label] - 1
 
     def exit_inst(self):
+        """Stops program execution with given return code"""
         symb1 = self.get_args()[0]
         var1 = self.symb_value(symb1)
         if symb1.type != 'int': error_exit(53, "Error 53: Wrong operand type")
@@ -686,14 +698,16 @@ class Instruction:
         exit(int(var1.value))
 
     def dprint(self):
+        """Returns given value to stderr"""
         symb1 = self.get_args()[0]
         var1 = self.symb_value(self.get_args()[0])
-        sys.stderr.write(symb1.type + '@' + var1.value)
+        sys.stderr.write(var1.type + '@' + var1.value)
 
     def break_inst(self):
         pass
 
     def clears(self):
+        """Clears data stack"""
         Memory.data_stack.clear()
 
     def instr_switch(self):
@@ -880,7 +894,6 @@ def main():
 
     # Main instruction calling
     while Memory.program_counter != len(instruction_list):
-        #print(Memory.program_counter)
         Instruction.instr_switch(instruction_list[Memory.program_counter])
         Memory.program_counter += 1
 
