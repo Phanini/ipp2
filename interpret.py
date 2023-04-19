@@ -12,6 +12,7 @@ def argument_parse(src, inp):
     parser = argparse.ArgumentParser(description='interpret.py ')
     parser.add_argument('--source=', action='store', dest='src', nargs='?')
     parser.add_argument('--input=', action='store', dest='inp', nargs='?')
+    parser.add_argument('--stats', )
     arguments = parser.parse_args()
     if arguments.inp is None and arguments.src is None:
         error_exit(10, "Error 10: Wrong script argument/usage")
@@ -90,7 +91,6 @@ class Memory:
         'TF': None
     }
     labels = dict()
-    instruction_stack = []
     program_counter = 0
     data_stack = []
     input_handle = ''
@@ -282,12 +282,12 @@ class Instruction:
         """Calls LABEL"""
         label = self.get_args()[0].value
         if label not in Memory.labels.keys(): error_exit(52, "Error 52: Undefined label")
-        Memory.instruction_stack.append(Memory.program_counter)
+        Memory.data_stack.append(Memory.program_counter)
         Memory.program_counter = Memory.labels[label] - 1
 
     def return_ins(self):
-        if not Memory.instruction_stack: error_exit(56, "Error 56: Missing value on instruction stack")
-        Memory.program_counter = Memory.instruction_stack.pop()
+        if not Memory.data_stack: error_exit(56, "Error 56: Missing value on instruction stack")
+        Memory.program_counter = Memory.data_stack.pop()
 
     def pushs(self):
         """
